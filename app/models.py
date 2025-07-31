@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, BigInteger
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, func, Float, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -13,6 +13,14 @@ class Status(str, Enum):
     READY = "Готово"
     REJECTED = "Отклонена"
     COMPLETED = "Завершена"
+
+ACTIVE_STATUSES = [
+    Status.WAITING,
+    Status.CARWAITING,
+    Status.DIAGNOSTIC,
+    Status.REPAIR,
+    Status.READY
+]
 
 class Role(str, Enum):
     DIAGNOSTIC = "диагностик"
@@ -37,20 +45,20 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "user_account"
 
-    user_id: Mapped[int] = mapped_column(nullable=False, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, primary_key=True)
     role: Mapped[Role] = mapped_column(SQLEnum(Role), nullable=False, default=Role.CLIENT)
     user_name: Mapped[str] = mapped_column(String(256), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
     phone: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
 
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
     diag_app = relationship("Application", back_populates="diagnostic", foreign_keys="[Application.diag_id]")
     mechanic_app = relationship("Application", back_populates="mechanic", foreign_keys="[Application.mechanic_id]")
 
 class Client(Base):
     __tablename__ = "client_account"
 
-    client_id: Mapped[int] = mapped_column(nullable=False, primary_key=True)
+    client_id: Mapped[int] = mapped_column(BigInteger, nullable=False, primary_key=True)
     user_name: Mapped[str] = mapped_column(String(256), nullable=True)
     phone: Mapped[str] = mapped_column(String(128), nullable=True, unique=True)
 
@@ -60,7 +68,7 @@ class Client(Base):
 class RefreshToken(Base):
     __tablename__ = "refresh_token"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     refresh_token: Mapped[str] = mapped_column(String(512), nullable=False, unique=True, index=True)
     used: Mapped[bool] = mapped_column(nullable=False, default=False)
     exp: Mapped[int] = mapped_column(nullable=False)
@@ -71,12 +79,13 @@ class RefreshToken(Base):
 class Car(Base):
     __tablename__ = "car"
 
-    id: Mapped[int] = mapped_column( primary_key=True, nullable = False)
-    client_id: Mapped[int] = mapped_column( ForeignKey("client_account.client_id", ondelete="CASCADE"), nullable = False)
+    id: Mapped[int] = mapped_column(primary_key=True, nullable = False)
+    client_id: Mapped[int] = mapped_column( ForeignKey("client_account.client_id"), nullable = False)
     brand: Mapped[str] = mapped_column(String(256), nullable=False)
     model: Mapped[str] = mapped_column(String(256), nullable=False)
     number: Mapped[str] = mapped_column(String(256), nullable=False)
     year: Mapped[int] = mapped_column(nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     owner = relationship("Client", back_populates="cars")
     applications = relationship("Application", back_populates="car")
@@ -84,10 +93,11 @@ class Car(Base):
 class Application(Base):
     __tablename__ = "application"
 
-    id: Mapped[int] = mapped_column(primary_key=True, nullable = False)
-    client_id: Mapped[int] = mapped_column(ForeignKey("client_account.client_id", ondelete="CASCADE"), nullable=False)
-    car_id: Mapped[int] = mapped_column(ForeignKey("car.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable = False)
+    client_id: Mapped[int] = mapped_column(ForeignKey("client_account.client_id"), nullable=False)
+    car_id: Mapped[int] = mapped_column(ForeignKey("car.id"), nullable=False)
     problem: Mapped[str] = mapped_column(nullable=True)
+    conn: Mapped[int] = mapped_column(nullable=False)
     admin_comment: Mapped[str] = mapped_column(nullable=True)
     diag_comment: Mapped[str] = mapped_column(nullable=True)
     mechanic_comment: Mapped[str] = mapped_column(nullable=True)

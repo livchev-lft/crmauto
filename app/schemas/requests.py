@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
 from app.models import Status, Role, Priority, Method
 
 class BaseRequest(BaseModel):
@@ -17,8 +17,10 @@ class UserUpdatePasswordRequest(BaseRequest):
 
 
 class UserCreateRequest(BaseRequest):
-    email: EmailStr
-    password: str
+    phone: constr(min_length=10)
+    password: constr(min_length=6)
+    user_name: str | None = None
+    role: Role
 
 class ClientRegisterRequest(BaseRequest):
     client_id: int
@@ -36,7 +38,7 @@ class AppRegisterRequest(BaseRequest):
     client_id: int
     car_id: int
     problem: Optional[str] = None
-    created_at: datetime
+    conn: int
 
 class ApplyAppAdminRequest(BaseRequest):
     admin_comment: Optional[str] = None
@@ -67,3 +69,6 @@ class MechanicFinishRequest(BaseModel):
     mechanic_comment: Optional[str] = None
     status: Status
     mechanic_price: float
+
+class ReplacePhoneRequest(BaseModel):
+    phone: str

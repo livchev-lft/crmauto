@@ -1,13 +1,15 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from starlette import status
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.api import deps
+from fastapi.responses import Response
 
-from app.schemas.responses import CheckClient, CheckCarResponse
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, bindparam, BigInteger
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+
+from app.api import deps
+from app.models import Client, Car, Application, ACTIVE_STATUSES
 from app.schemas.requests import AppRegisterRequest, ClientRegisterRequest, CarRegisterRequest
-from app.models import Client, Car, Application
+from app.schemas.responses import CheckClient, GetAppsResponse, CheckCarResponse
 
 router = APIRouter()
 
@@ -18,7 +20,8 @@ router = APIRouter()
 async def check_client(
         client_id: int,
         session: AsyncSession = Depends(deps.get_session)):
-    client = await session.scalar(select(Client).where(Client.client_id == client_id))
+    stmt = select(Client).where(Client.client_id == bindparam("client_id", type_=BigInteger))
+    client = await session.scalar(stmt.params(client_id=client_id))
     if not client:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -48,11 +51,11 @@ async def register_client(
     response_model=list[CheckCarResponse],
     status_code=status.HTTP_200_OK
 )
-async def mycar(
+async def my_car(
         client_id: int,
         session: AsyncSession = Depends(deps.get_session)
 ):
-    result = await session.execute(select(Car).where(Car.client_id == client_id))
+    result = await session.execute(select(Car).where(Car.client_id == client_id, Car.is_deleted == False))
     cars = result.scalars().all()
     return cars
 
@@ -78,12 +81,83 @@ async def add_app(
         session: AsyncSession = Depends(deps.get_session)
 ):
     new_app = Application(
-        client_id=app_data.client_id,
-        car_id=app_data.car_id,
+        client_id = app_data.client_id,
+        car_id = app_data.car_id,
         problem = app_data.problem,
+        conn = app_data.conn,
         created_at = datetime.now()
     )
     session.add(new_app)
     await session.commit()
-    return {"detail": "Success"}
+    return {"id": new_app.id}
 
+@router.delete("/delete_car/{car_id}")
+async def delete_car(
+        car_id: int,
+        session: AsyncSession = Depends(deps.get_session)
+):
+    result = await session.execute(select(Car).where(Car.id == car_id))
+    car = result.scalar_one_or_none()
+    if not car:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    car.is_deleted = True
+    session.add(car)
+    await session.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.patch("/replace_phone")
+async def replace_phone(
+        client_id: int,
+        phone: str,
+        session: AsyncSession = Depends(deps.get_session)
+):
+    result = await session.execute(select(Client).where(Client.client_id == client_id))
+    client = result.scalars().first()
+    if not client:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    client.phone = phone
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("/get_apps",
+            response_model=list[GetAppsResponse],
+            status_code=status.HTTP_200_OK
+            )
+async def get_apps(
+        client_id: int,
+        session: AsyncSession = Depends(deps.get_session)
+):
+    result = await session.execute(select(Application).where(Application.client_id == client_id))
+    apps = result.scalars().all()
+    return apps
+
+@router.get("/check_car_app")
+async def get_app_car(
+        car_id: int,
+        session: AsyncSession = Depends(deps.get_session)
+):
+    stmt = select(Application).where(
+        Application.car_id == car_id,
+        Application.status.in_(ACTIVE_STATUSES)
+    )
+    result = await session.execute(stmt)
+    app = result.scalars().first()
+    if app:
+        return Response(status_code=status.HTTP_200_OK)
+    else:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+@router.get("/check_client_car",
+            response_model=CheckCarResponse,
+            status_code=status.HTTP_200_OK
+            )
+async def check_client_car(
+        car_id: int,
+        session: AsyncSession = Depends(deps.get_session)
+):
+    result = await session.execute(select(Car).where(Car.id == car_id))
+    car = result.scalars().first()
+    return car

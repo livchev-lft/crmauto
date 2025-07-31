@@ -30,12 +30,19 @@ class NewAppToAdminResponse(BaseResponse):
 
 class CheckClient(BaseResponse):
     client_id: int
+    user_name: Optional[str]
+    phone: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 class CheckCarResponse(BaseResponse):
+    id: int
     brand: str
     model: str
     number: str
     year: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 class DiagGetAppResponse(BaseResponse):
     cleint_id: int
@@ -54,3 +61,46 @@ class MechanicGetResponse(BaseResponse):
     priority: Priority
 
 class AdminGetFinishAppResponse(BaseResponse):
+    app_id: int
+
+class GetAppsResponse(BaseResponse):
+    id: int
+    car_id: int
+    problem: str
+    conn: int
+    admin_comment: Optional[str] = None
+    diag_comment: Optional[str] = None
+    mechanic_comment: Optional[str] = None
+    status: Status = Status.WAITING
+    arrival_time: Optional[datetime] = None
+    created_at: datetime
+    diag_price: Optional[float] = None
+    mechanic_price: Optional[float] = None
+
+class AdminGetStartAppResponse(BaseResponse):
+    app_id: int
+    client_id: int
+    car_id: int
+    problem: str
+    conn: int
+    phone: str
+    brand: str
+    model: str
+    number: str
+    year: int
+
+class AppListItem(BaseResponse):
+    id: int
+    client_id: int
+    car_id: int
+    problem: str
+    conn: int
+    created_at: datetime
+    car: CheckCarResponse
+    client: CheckClient
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DiagNamesList(BaseResponse):
+    user_id: int
+    user_name: str

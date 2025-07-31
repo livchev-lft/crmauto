@@ -32,4 +32,3 @@ async def add_user(
     session.add(new_user)
     await session.commit()
     return new_user
-

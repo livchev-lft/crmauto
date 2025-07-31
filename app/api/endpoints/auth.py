@@ -70,7 +70,7 @@ async def login_access_token(
     session: AsyncSession = Depends(deps.get_session),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> AccessTokenResponse:
-    user = await session.scalar(select(User).where(User.email == form_data.username))
+    user = await session.scalar(select(User).where(User.user_id == form_data.username))
 
     if user is None:
         # this is naive method to not return early
@@ -87,7 +87,7 @@ async def login_access_token(
             detail=api_messages.PASSWORD_INVALID,
         )
 
-    jwt_token = create_jwt_token(user_id=user.user_id)
+    jwt_token = create_jwt_token(user_id=str(user.user_id))
 
     refresh_token = RefreshToken(
         user_id=user.user_id,
@@ -140,7 +140,7 @@ async def refresh_token(
     token.used = True
     session.add(token)
 
-    jwt_token = create_jwt_token(user_id=token.user_id)
+    jwt_token = create_jwt_token(user_id=str(token.user_id))
 
     refresh_token = RefreshToken(
         user_id=token.user_id,
@@ -168,7 +168,7 @@ async def register_new_user(
     new_user: UserCreateRequest,
     session: AsyncSession = Depends(deps.get_session),
 ) -> User:
-    user = await session.scalar(select(User).where(User.email == new_user.email))
+    user = await session.scalar(select(User).where(User.user_id == new_user.email))
     if user is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
